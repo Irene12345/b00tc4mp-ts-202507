@@ -26,7 +26,7 @@ const constants = {
     }
 }
 
-//Cómo vamos a guardar la informacion de State? En un objeto:
+//Guardamos la informacion de State en un objeto:
 const state = {
     score: 0,
     lives: 3,
@@ -64,18 +64,38 @@ Logic
 - reset game
 */
 
-//ver si colisionan player y enemies utilizando las coordenadas de los vertices de cada uno
+//Collission detection logic
+function checkCollision() {
+    //cálculo de dimensiones por la mitad (ya que usaremos esa mitad para calcular los vértices)
+    const playerHalfWidth = constants.player.dimensions.width / 2;
+    const playerHalfHeight = constants.player.dimensions.height / 2;
+    const enemyHalfWidth = constants.enemy.dimensions.width / 2;
+    const enemyHalfHeight = constants.enemy.dimensions.height / 2;
 
-//vertices de player
-let playerCoord = state.player.position
+    //cálculo de posición de los vértices de player usando datos de state y sus 'dimensiones / 2'
+    const playerVertices = {
+        topLeft: { x: state.player.position.x - playerHalfWidth, y: state.player.position.y + playerHalfHeight },
+        topRight: { x: state.player.position.x + playerHalfWidth, y: state.player.position.y + playerHalfHeight },
+        bottomRight: { x: state.player.position.x + playerHalfWidth, y: state.player.position.y - playerHalfHeight },
+        bottomLeft: { x: state.player.position.x - playerHalfWidth, y: state.player.position.y - playerHalfHeight }
+    }
 
-//vertices de cada enemy
-let enemiesCoord = state.enemies
+    //usamos método 'some': recorre todo el array de enemies, y calcula si alguno/algunos elementos cumplen con la condición que pasamos en el callback, y devuelve true/false.
+    return state.enemies.some(enemy => {
+        //cálculo de posición de los vértices de enemy usando datos de state y sus 'dimensiones / 2'
+        const enemyVertices = {
+            topLeft: { x: enemy.position.x - enemyHalfWidth, y: enemy.position.y + enemyHalfHeight },
+            topRight: { x: enemy.position.x + enemyHalfWidth, y: enemy.position.y + enemyHalfHeight },
+            bottomRight: { x: enemy.position.x + enemyHalfWidth, y: enemy.position.y - enemyHalfHeight },
+            bottomLeft: { x: enemy.position.x - enemyHalfWidth, y: enemy.position.y - enemyHalfHeight }
+        }
 
-const checkCollision = () => {
-    
-
-    //comprobar si alguno de los vertices de player solapa los de alguno de los enemies (o viceversa)
+        //comparamos los vertices de player y enemy. NOTA: fijarse que en realidad solo hace falta utilizar topLeft y bottomRight para el cálculo.
+        return playerVertices.topLeft.x <= enemyVertices.bottomRight.x &&
+            playerVertices.bottomRight.x >= enemyVertices.topLeft.x &&
+            playerVertices.topLeft.y >= enemyVertices.bottomRight.y &&
+            playerVertices.bottomRight.y <= enemyVertices.topLeft.y
+    })
 }
 
 
