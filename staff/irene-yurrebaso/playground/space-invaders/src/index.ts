@@ -1,324 +1,171 @@
-/*
-State
-- score
-- lives
-- difficulty
-- level
-- ship position
-- invaders position
-- bullets position
-- game over
-*/
+//Game, Scene, Invaders, Ship y Bullets son todos componentes, por lo que podemos crear una super clase que se extiende al resto.
 
-// Constantes para todo el juego:
-const constants = {
-    ship: {
-        dimensions: { width: 50, height: 50 }
-    },
-    invader: {
-        dimensions: { width: 50, height: 50 }
-    },
-    bullet: {
-        dimensions: { width: 5, height: 10 }
-    },
-    scene: {
-        dimensions: { width: 800, height: 600 }
-    }
-};
+class Component {
+    private container: HTMLElement
 
-//Guardamos la informacion de State en un objeto:
-const state = {
-    score: 0,
-    lives: 3,
-    difficulty: "easy",
-    level: 1,
-    ship: {
-        position: { x: 400, y: 100 }
-    },
-    invaders: [{
-        position: { x: 100, y: 500 },
-    }, {
-        position: { x: 200, y: 500 },
-    }, {
-        position: { x: 300, y: 500 }
-    }, {
-        position: { x: 400, y: 500 }
-    }, {
-        position: { x: 500, y: 500 }
-    }, {
-        position: { x: 600, y: 500 }
-    }, {
-        position: { x: 700, y: 500 }
-    }, {
-        position: { x: 100, y: 400 }
-    }, {
-        position: { x: 200, y: 400 }
-    }, {
-        position: { x: 300, y: 400 }
-    }, {
-        position: { x: 400, y: 400 }
-    }, {
-        position: { x: 500, y: 400 }
-    }, {
-        position: { x: 600, y: 400 }
-    }, {
-        position: { x: 700, y: 400 }
-    }],
-    //En bullets inicialmente no hay nada []. En el tipado se le dice q ese array guarda objetos con la propiedad 'position', q a su vez tiene propiedades 'x' e 'y' q son de tipo number. 
-    bullets: [] as { position: { x: number, y: number } }[],
-    gameOver: false
-};
+    //aquí no le permitimos q sea nulo
+    constructor(container: HTMLElement) {
+        if (!container) throw new Error ("Container element is required")
 
-/* 
-Logic:
-- move ship
-- move invaders
-- shoot bullet
-- check collision
-- update score
-- update lives
-- update level
-- reset game
-*/
-
-//Collision detection logic
-function checkCollisionShipVsInvaders() {
-    //cálculo de dimensiones por la mitad (ya que usaremos esa mitad para calcular los vértices)
-    const shipHalfWidth = constants.ship.dimensions.width / 2;
-    const shipHalfHeight = constants.ship.dimensions.height / 2;
-    const invaderHalfWidth = constants.invader.dimensions.width / 2;
-    const invaderHalfHeight = constants.invader.dimensions.height / 2;
-
-    //cálculo de posición de los vértices de ship usando datos de state y sus "dimensiones / 2"
-    const shipVertices = {
-        topLeft: { x: state.ship.position.x - shipHalfWidth, y: state.ship.position.y + shipHalfHeight },
-        topRight: { x: state.ship.position.x + shipHalfWidth, y: state.ship.position.y + shipHalfHeight },
-        bottomRight: { x: state.ship.position.x + shipHalfWidth, y: state.ship.position.y - shipHalfHeight },
-        bottomLeft: { x: state.ship.position.x - shipHalfWidth, y: state.ship.position.y - shipHalfHeight }
+        this.container = container
     }
 
-    //usamos método "some": recorre todo el array de invaders, y calcula si alguno(s) elemento(s) cumplen con la condición que pasamos en el callback, y devuelve true/false.
-    const collision = state.invaders.some(invader => {
-        //cálculo de posición de los vértices de invader usando datos de state y sus "dimensiones / 2"
-        const invaderVertices = {
-            topLeft: { x: invader.position.x - invaderHalfWidth, y: invader.position.y + invaderHalfHeight },
-            topRight: { x: invader.position.x + invaderHalfWidth, y: invader.position.y + invaderHalfHeight },
-            bottomRight: { x: invader.position.x + invaderHalfWidth, y: invader.position.y - invaderHalfHeight },
-            bottomLeft: { x: invader.position.x - invaderHalfWidth, y: invader.position.y - invaderHalfHeight }
-        }
+    public getContainer(): HTMLElement {
+        return this.container!
+    }
 
-        //comparamos los vertices de ship y invader. NOTA: fijarse que en realidad solo hace falta utilizar topLeft y bottomRight para el cálculo.
-        return shipVertices.topLeft.x <= invaderVertices.bottomRight.x &&
-            shipVertices.bottomRight.x >= invaderVertices.topLeft.x &&
-            shipVertices.topLeft.y >= invaderVertices.bottomRight.y &&
-            shipVertices.bottomRight.y <= invaderVertices.topLeft.y
-    })
+    //añade cualquier otro componente hijo (Game, Scene, Invader, Ship...). Cualquiera que extienda de Component tendrá un container
+    public add(object: Component): void {
+        this.getContainer()?.appendChild(object.getContainer()!)
+    }
+}
 
-    if (collision) {
-        state.lives -= 1
-        if (state.lives <= 0) {
-            state.gameOver = true
-            alert("Game over")
-        } else {
-            alert(`You have ${state.lives} lives left`)
+class Scene extends Component {
+    //datos privados porque solo confieren a la escena, privado evita q sean visibles fuera de la instancia de la clase
+    private width: number;
+    private height: number;
+
+    constructor(width: number, height: number) {
+        //al super le paso el container
+        super(document.createElement("div"))
+
+        this.width = width
+        this.height = height
+
+        this.getContainer()!.style.position = "relative"
+        this.getContainer()!.style.width = `${width}px`
+        this.getContainer()!.style.height = `${height}px`
+        this.getContainer()!.style.border = `1px solid black`
+        this.getContainer()!.style.overflow = "hidden"
+        this.getContainer()!.style.backgroundColor = "gray"
+    }
+
+    public getWidth(): number {
+        return this.width
+    }
+
+    public getHeight(): number {
+        return this.height
+    }
+}
+
+class Ship extends Component {
+    private x: number = 0
+    private y: number = 0
+    private width: number = 0
+    private height: number = 0
+
+    constructor(x: number, y: number, width: number, height: number) {
+        super(document.createElement("div"))
+
+        this.x = x
+        this.y = y
+        this.width = width
+        this.height = height
+
+        this.getContainer()!.style.position = "absolute"
+        this.getContainer()!.style.width = `${width}px`
+        this.getContainer()!.style.height = `${height}px`
+        this.getContainer()!.style.left = `${x - width / 2}px`
+        this.getContainer()!.style.bottom = `${y - height / 2}px`
+        this.getContainer()!.style.backgroundImage = "url(./public/images/ship.png"
+        this.getContainer()!.style.backgroundSize = "cover"
+    }
+}
+
+class Bullet extends Component {
+    private x: number = 0
+    private y: number = 0
+    private width: number = 0
+    private height: number = 0
+
+    constructor(x: number, y: number, width: number, height: number) {
+        super(document.createElement("div"))
+
+        this.x = x
+        this.y = y
+        this.width = width
+        this.height = height
+
+        this.getContainer()!.style.position = "absolute"
+        this.getContainer()!.style.width = `${width}px`
+        this.getContainer()!.style.height = `${height}px`
+        this.getContainer()!.style.backgroundColor = "red"
+        this.getContainer()!.style.left = `${x - width / 2}px`
+        this.getContainer()!.style.bottom = `${y - height / 2}px`
+    }
+}
+
+class Alien extends Component {
+    private x: number = 0
+    private y: number = 0
+    private width: number = 0
+    private height: number = 0
+
+    constructor(x: number, y: number, width: number, height: number) {
+        super(document.createElement("div"))
+
+        this.x = x
+        this.y = y
+        this.width = width
+        this.height = height
+
+        this.getContainer()!.style.position = "absolute"
+        this.getContainer()!.style.width = `${width}px`
+        this.getContainer()!.style.height = `${height}px`
+        this.getContainer()!.style.left = `${x - width / 2}px`
+        this.getContainer()!.style.bottom = `${y - height / 2}px`
+        this.getContainer()!.style.backgroundImage = "url(./public/images/invader.png)"
+        this.getContainer()!.style.backgroundSize = "cover"
+    }
+}
+
+class Game extends Component {
+    private scene: Scene
+    private ship: Ship
+    private bullets: Bullet[]
+    private aliens: Alien[]
+
+    constructor(containerId: string) {
+        super(document.getElementById(containerId)!)
+
+        //creamos la escena y la agregamos al contenedor del Game
+        this.scene = new Scene(800, 600)
+        //Game añade la escena como hija
+        this.add(this.scene)
+
+        this.ship = new Ship(400, 50, 50, 50)
+        //Escena añade como hijo al ship
+        this.scene.add(this.ship)
+
+        this.bullets = []
+        this.aliens = []
+
+        // Initialize aliens in a grid
+        const rows = 2
+        const cols = 7
+        const alienWidth = 50
+        const alienHeight = 50
+        
+        //hemos puesto el width de la scene privado, por lo que no podemos acceder directamente, sino a traves de un getter
+        const colSpacing = this.scene.getWidth() / (cols + 1)
+        const rowSpacing = 50
+        
+        // para cada alien va calculando la posicion x e y
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                //la x va cambiando para cada alien
+                const x = col * (alienWidth + colSpacing) + colSpacing
+                //y es igual para los primeros 7 aliens y luego cambia para los siguientes
+                const y = this.scene.getHeight() - (row + 1) * rowSpacing
+
+                const alien = new Alien(x, y, alienWidth, alienHeight)
+                this.aliens.push(alien) //guardamos cada alien en el array
+                this.scene.add(alien) //y añadimos cada alien a la escena
+            }
         }
     }
 }
 
-function checkCollisionBulletVsInvaders() {
-    //coger la mitad del alto y ancho de la bala & la mitad de la altura y anchura del invader, para saber su centro y posterior calcular posicion de vertices
-    const bulletHalfWidth = constants.bullet.dimensions.width / 2;
-    const bulletHalfHeight = constants.bullet.dimensions.height / 2;
-    const invaderHalfWidth = constants.invader.dimensions.width / 2;
-    const invaderHalfHeight = constants.invader.dimensions.height / 2;
-
-    //coge todas las balas una por una y mira la posición de sus vértices
-    return state.bullets.forEach(bullet => {
-        const bulletVertices = {
-            topLeft: { x: bullet.position.x - bulletHalfWidth, y: bullet.position.y + bulletHalfHeight },
-            topRight: { x: bullet.position.x + bulletHalfWidth, y: bullet.position.y + bulletHalfHeight },
-            bottomRight: { x: bullet.position.x + bulletHalfWidth, y: bullet.position.y - bulletHalfHeight },
-            bottomLeft: { x: bullet.position.x - bulletHalfWidth, y: bullet.position.y - bulletHalfHeight }
-        }
-
-        //y va mirando si coinciden con los vértices de cada invader uno por uno
-        //con el 'filter' está quitando los invaders que han colisionado
-        state.invaders = state.invaders.filter(invader => {
-            const invaderVertices = {
-                topLeft: { x: invader.position.x - invaderHalfWidth, y: invader.position.y + invaderHalfHeight },
-                topRight: { x: invader.position.x + invaderHalfWidth, y: invader.position.y + invaderHalfHeight },
-                bottomRight: { x: invader.position.x + invaderHalfWidth, y: invader.position.y - invaderHalfHeight },
-                bottomLeft: { x: invader.position.x - invaderHalfWidth, y: invader.position.y - invaderHalfHeight }
-            }
-
-            const collision = bulletVertices.topLeft.x <= invaderVertices.bottomRight.x &&
-                bulletVertices.bottomRight.x >= invaderVertices.topLeft.x &&
-                bulletVertices.topLeft.y >= invaderVertices.bottomRight.y &&
-                bulletVertices.bottomRight.y <= invaderVertices.topLeft.y
-
-            if (collision) {
-                state.score += 10
-
-                //quitar el invader del DOM para que no aparezca en escena
-                invadersElements.forEach((invaderElement, index) => {
-                    //miramos los estados de los invaders, pedimos el índice del estado de ese invader
-                    const invaderIndex = state.invaders.indexOf(invader)
-                    //si el índice es el mismo, este estado pertenece a este invader, y quitamos al invader del scene
-                    if (index === invaderIndex) {
-                        sceneElement.removeChild(invaderElement)
-                        //splice para actualizar el array que contiene los div's
-                        invadersElements.splice(index, 1)
-                    }
-                })
-
-                //quitar la bala que ha colisionado
-                bulletsElements.forEach((bulletElement, index) => {
-                    const bulletIndex = state.bullets.indexOf(bullet)
-
-                    if (index === bulletIndex) {
-                        //quita la bala del DOM
-                        sceneElement.removeChild(bulletElement)
-                        //actualiza array que contiene los div's
-                        bulletsElements.splice(index, 1)
-                        //quita la bala del state
-                        state.bullets.splice(index, 1)
-                    }
-                })
-            }
-
-            //el negado de la colision significa 'false'
-            return !collision
-        })
-    })
-}
-
-/* Interface */
-
-const sceneElement = document.getElementById("scene") as HTMLDivElement;
-sceneElement.style.position = "relative";
-sceneElement.style.width = "800px";
-sceneElement.style.height = "600px";
-sceneElement.style.backgroundColor = "gray";
-
-const shipElement = document.createElement("div") as HTMLDivElement;
-//se posiciona de forma absoluta en el espacio de scene (closest positioned ancestor)
-shipElement.style.position = "absolute";
-shipElement.style.width = `${constants.ship.dimensions.width}px`;
-shipElement.style.height = `${constants.ship.dimensions.height}px`;
-shipElement.style.backgroundImage = "url(./public/images/ship.png)";
-shipElement.style.backgroundSize = "cover";
-shipElement.style.left = `${state.ship.position.x - constants.ship.dimensions.width / 2}px`;
-shipElement.style.top = `${constants.scene.dimensions.height - (state.ship.position.y + constants.ship.dimensions.height / 2)}px`
-
-const invadersElements = state.invaders.map(invader => {
-    const invaderElement = document.createElement("div") as HTMLDivElement
-    invaderElement.style.position = "absolute"
-    invaderElement.style.width = `${constants.invader.dimensions.width}px`
-    invaderElement.style.height = `${constants.invader.dimensions.height}px`
-    invaderElement.style.backgroundImage = "url(./public/images/invader.png)"
-    invaderElement.style.backgroundSize = "cover"
-    invaderElement.style.left = `${invader.position.x - constants.invader.dimensions.width / 2}px`
-    invaderElement.style.top = `${constants.scene.dimensions.height - (invader.position.y + constants.invader.dimensions.height / 2)}px`
-    return invaderElement
-})
-
-//los pintamos en el div con id "scene"
-sceneElement.appendChild(shipElement);
-invadersElements.forEach(invader => sceneElement.appendChild(invader));
-
-//array vacio para luego guardar los elementos div de las balas
-const bulletsElements = [] as HTMLDivElement[];
-
-//Detectar evento de presionar tecla (flechas en este caso)
-document.addEventListener("keyup", event => {
-    const step = 10
-
-    //actualizamos estado de la nave
-    if (event.key === "ArrowLeft") {
-        // Desplaza la nave en relacion a su centro. 
-        // Escoge el máximo para evitar que la nave se vaya fuera de la pantalla.
-        state.ship.position.x = Math.max(state.ship.position.x - step, constants.ship.dimensions.width / 2)
-    } else if (event.key === "ArrowRight") {
-        state.ship.position.x = Math.min(state.ship.position.x + step, constants.scene.dimensions.width - constants.ship.dimensions.width / 2)
-    } else if (event.key === "ArrowUp") {
-        state.ship.position.y = Math.min(state.ship.position.y + step, constants.scene.dimensions.height - constants.ship.dimensions.height / 2)
-    } else if (event.key === "ArrowDown") {
-        state.ship.position.y = Math.max(state.ship.position.y - step, constants.ship.dimensions.height / 2)
-    }
-
-    //actualiza vista en DOM (left y top del div)
-    shipElement.style.left = `${state.ship.position.x - constants.ship.dimensions.width / 2}px`
-    shipElement.style.top = `${constants.scene.dimensions.height - (state.ship.position.y + constants.ship.dimensions.height / 2)}px`
-
-    //crear balas si presionamos spacebar
-    if (event.key === " ") {
-        //shoot bullet
-        const bullet = {
-            position: { x: state.ship.position.x, y: state.ship.position.y + constants.ship.dimensions.height / 2 + constants.bullet.dimensions.height / 2 }
-        }
-
-        state.bullets.push(bullet)
-
-        //pintamos bullet en DOM
-        const bulletElement = document.createElement("div")
-        bulletElement.style.position = "absolute"
-        bulletElement.style.width = `${constants.bullet.dimensions.width}px`
-        bulletElement.style.height = `${constants.bullet.dimensions.height}px`
-        bulletElement.style.backgroundColor = "yellow"
-        bulletElement.style.left = `${bullet.position.x - constants.bullet.dimensions.width / 2}px`
-        bulletElement.style.top = `${constants.scene.dimensions.height - (bullet.position.y + constants.bullet.dimensions.height / 2)}px`
-
-        sceneElement.appendChild(bulletElement)
-        bulletsElements.push(bulletElement)
-    }
-})
-
-//Game Loop: cada cierto intervalo de tiempo, ejecuta todo lo que hay dentro de la funcion setInterval() cada 200 milisegundos.
-//Hacer que los invaders se muevan
-setInterval(() => {
-    //Si hemos terminado el juego, q no haga nada
-    if (state.gameOver) return
-
-    //Y si el juego sigue:
-    state.invaders = state.invaders.map(invader => {
-        // Mover invaders en el state -5 puntos
-        invader.position.y -= 5
-
-        //si están por debajo de 0 porque se han pasado, limita su posición para que no se vayan fuera de la escena
-        if (invader.position.y - constants.invader.dimensions.height / 2 < 0) {
-            invader.position.y = constants.scene.dimensions.height - constants.invader.dimensions.height / 2
-        }
-
-        // Pintar invaders en el DOM
-        const invaderIndex = state.invaders.indexOf(invader)
-        const invaderElement = invadersElements[invaderIndex]!
-        invaderElement.style.left = `${invader.position.x - constants.invader.dimensions.width / 2}px`
-        invaderElement.style.top = `${constants.scene.dimensions.height - (invader.position.y + constants.invader.dimensions.height / 2)}px`
-
-        return invader
-    })
-
-    // mover las balas
-    state.bullets = state.bullets.map((bullet, index) => {
-        bullet.position.y += 10
-
-        if (bullet.position.y - constants.bullet.dimensions.height / 2 > constants.scene.dimensions.height) {
-            // remove bullet
-            state.bullets.splice(index, 1)
-            const bulletElement = bulletsElements[index]!
-            sceneElement.removeChild(bulletElement)
-            bulletsElements.splice(index, 1)
-        } else {
-            const bulletElement = bulletsElements[index]!
-            bulletElement.style.left = `${bullet.position.x - constants.bullet.dimensions.width / 2}px`
-            bulletElement.style.top = `${constants.scene.dimensions.height - (bullet.position.y + constants.bullet.dimensions.height / 2)}px`
-        }
-
-        return bullet
-    })
-
-    // En cada iteracion se comprueban las colisiones
-    checkCollisionShipVsInvaders()
-    checkCollisionBulletVsInvaders()
-}, 200);
-
+//Initialize the game
+const game = new Game("game")
