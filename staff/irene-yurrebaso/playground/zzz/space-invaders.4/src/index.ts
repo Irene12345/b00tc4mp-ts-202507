@@ -9,8 +9,6 @@ class Component {
     private width: number = 0
     private height: number = 0
 
-    private moveCallback: (() => void) | null = null
-
     //aquí no le permitimos q sea nulo
     //todo Component va a tener contenedor, posicionamiento y dimensiones
     constructor(container: HTMLElement, x: number, y: number, width: number, height: number) {
@@ -34,9 +32,6 @@ class Component {
 
         this.getContainer().style.left = `${x - this.width / 2}px`
         this.getContainer().style.bottom = `${y - this.height / 2}px`
-
-        //si hay callback, lo llamamos. Ponemos esto a nivel componente porque sera igual para todos.
-        if (this.moveCallback) this.moveCallback()
     }
 
     public getX(): number {
@@ -70,13 +65,6 @@ class Component {
         this.getContainer()?.appendChild(object.getContainer()!)
     }
 
-    //quitar un componente hijo de un contenedor padre
-    public remove(object: Component): void {
-        if (!(object instanceof Component)) throw new Error("object is not a Component")
-
-        this.getContainer()?.removeChild(object.getContainer()!)
-    }
-
     // detecta colision del componente con cualquier otro Componente
     public collidesWith(object: Component): boolean {
         if (!(object instanceof Component)) throw new Error("object is not a Component")
@@ -86,12 +74,6 @@ class Component {
             this.getX() + this.getWidth() > object.getX() &&
             this.getY() < object.getY() + object.getHeight() &&
             this.getY() + this.getHeight() > object.getY()
-    }
-
-    //este callback se llamaria cuando existe en setPosition (cuando cambiamos la posicion)
-    //callback es una función que no recibe parámetros (()) y no devuelve nada (void). Se le puede pasar cualquier funcion para q se ejecute en el momento adecuado. Permite reaccionar a movimientos sin tener que modificar la clase base.
-    public onMove(callback: () => void): void {
-        this.moveCallback = callback
     }
 }
 
@@ -106,12 +88,30 @@ class Scene extends Component {
 }
 
 class Ship extends Component {
-        constructor(x: number, y: number, width: number, height: number) {
+    //moveCallback es una propiedad
+    private moveCallback: (() => void) | null = null
+
+    constructor(x: number, y: number, width: number, height: number) {
         super(document.createElement("div"), x, y, width, height)
 
         this.getContainer().style.backgroundImage = "url(./public/images/ship.png"
         this.getContainer().style.backgroundSize = "cover"
 
+        document.addEventListener("keydown", event => {
+            const step = 10
+            if (event.key === "ArrowLeft") {
+                this.setPosition(this.getX() - step, this.getY())
+            } else if (event.key === "ArrowRight") {
+                this.setPosition(this.getX() + step, this.getY())
+            }
+
+            //si está inicializado, lo llamo
+            if (this.moveCallback) this.moveCallback()
+        })
+    }
+    //aqui lo inicializo
+    public onMove(callback: () => void): void {
+        this.moveCallback = callback
     }
 }
 
@@ -125,11 +125,25 @@ class Bullet extends Component {
 }
 
 class Alien extends Component {
+    private moveCallback: (() => void) | null = null
+
     constructor(x: number, y: number, width: number, height: number) {
         super(document.createElement("div"), x, y, width, height)
 
         this.getContainer().style.backgroundImage = "url(./public/images/invader.png)"
         this.getContainer().style.backgroundSize = "cover"
+
+        setInterval(() => {
+            const step = 10
+
+            this.setPosition(this.getX(), this.getY() - step)
+
+            if (this.moveCallback) this.moveCallback()
+        }, 100)
+    }
+
+    public onMove(callback: () => void): void {
+        this.moveCallback = callback
     }
 }
 
@@ -172,45 +186,6 @@ class Game extends Component {
             })
         })
 
-        //mueve el ship que tenemos dentro de Game
-        document.addEventListener("keydown", event => {
-            const step = 10
-            if (event.key === "ArrowLeft") {
-                this.ship.setPosition(this.ship.getX() - step, this.ship.getY())
-            } else if (event.key === "ArrowRight") {
-                this.ship.setPosition(this.ship.getX() + step, this.ship.getY())
-                //para las bullets, se tienen que posicionar respecto al ship
-            } else if (event.key === " ") {
-                const bullet = new Bullet(this.ship.getX(), this.ship.getY() + this.ship.getHeight() / 2, 5, 10)
-                
-                //meter la bala dentro del array de balas, para actualizar despues su posicion en el setInterval
-                this.bullets.push(bullet)
-                //añadir a la escena para que se pinten
-                this.scene.add(bullet)
-
-                //ver si al moverse la bala colisiona con algun alien
-                bullet.onMove(() => {
-                    //hacer un forEach pq son varios aliens
-                    this.aliens.forEach(alien => {
-                        if (bullet.collidesWith(alien)) {
-                            //si colisiona, eliminar el alien del array
-                            let index = this.aliens.indexOf(alien)
-                            this.aliens.splice(index, 1)
-
-                            //eliminarlo de la escena
-                            this.scene.remove(alien)
-
-                            //lo mismo para la bala
-                            index = this.bullets.indexOf(bullet)
-                            this.bullets.splice(index, 1)
-
-                            this.scene.remove(bullet)
-                        }
-                    })
-                })
-            }
-        })
-
         this.bullets = []
         this.aliens = []
 
@@ -230,7 +205,7 @@ class Game extends Component {
                 //la x va cambiando para cada alien
                 const x = col * (alienWidth + colSpacing) + colSpacing
                 //y es igual para los primeros 7 aliens y luego cambia para los siguientes
-                const y = this.scene.getHeight() - row  * rowSpacing - alienHeight / 2
+                const y = this.scene.getHeight() - (row + 1) * rowSpacing
 
                 const alien = new Alien(x, y, alienWidth, alienHeight)
                 this.aliens.push(alien) //guardamos cada alien en el array
@@ -249,24 +224,6 @@ class Game extends Component {
                 })
             }
         }
-
-        //un solo setInterval q cambia todos los aliens de posicion
-        setInterval(() => {
-            const step = 10
-
-            //para la posicion de Y, hacemos un cálculo para q si salen de la pantalla al bajar, vuelvan a aparecer por arriba.
-            this.aliens.forEach(alien => alien.setPosition(alien.getX(), alien.getY() > alienHeight / 2 ? alien.getY() - step : this.scene.getHeight() - alienHeight / 2))
-        }, 300)
-
-        //mover las balas hacia arriba, respecto a la posicion en la que esten
-        setInterval(() => {
-            const step = 5
-
-            this.bullets.forEach(bullet => {
-                bullet.setPosition(bullet.getX(), bullet.getY() + step)
-            })
-
-        }, 50)
     }
 }
 
