@@ -108,7 +108,7 @@ class Scene extends Component {
 }
 
 class Ship extends Component {
-    constructor(x: number, y: number, width: number, height: number) {
+        constructor(x: number, y: number, width: number, height: number) {
         super(document.createElement("div"), x, y, width, height)
 
         this.getContainer().style.backgroundImage = "url(./public/images/ship.png"
@@ -144,20 +144,9 @@ class Game extends Component {
 
     private gameOver: boolean = false
 
-    //recogemos el id de los setInterval; siempre tiene q tener un valor por defecto por eso le ponemos 0, y no queremos q sea null
-    private aliensIntervalId: number = 0
-    private bulletsIntervalId: number = 0
-
-    //utilizamos este callback cuando termine el juego
-    private overCallback: (() => void) | null = null
-
-    public onOver(callback: () => void): void {
-        this.overCallback = callback
-    }
-
-    constructor(x: number, y: number, width: number, height: number) {
+    constructor(containerId: string, x: number, y: number, width: number, height: number) {
         //le tenemos que poner la admiracion ! para confirmar que el div va a estar ahi
-        super(document.createElement("div"), x, y, width, height)
+        super(document.getElementById(containerId)!, x, y, width, height)
 
         this.getContainer().style.position = "relative"
         this.getContainer().style.backgroundColor = "darkgray"
@@ -171,6 +160,20 @@ class Game extends Component {
         //Escena añade como hijo al ship
         this.scene.add(this.ship)
 
+        //Game tiene que detectar si la nava y los marcianos se han movido, para eso usamos callbacks
+        //onMove es un metodo particular de ship
+        this.ship.onMove(() => {
+            if (this.gameOver) return
+
+            this.aliens.forEach(alien => {
+                if (this.ship.collidesWith(alien)) {
+                    alert("Game Over!")
+
+                    this.gameOver = true
+                }
+            })
+        })
+
         //mueve el ship que tenemos dentro de Game
         document.addEventListener("keydown", event => {
             const step = 10
@@ -181,7 +184,7 @@ class Game extends Component {
                 //para las bullets, se tienen que posicionar respecto al ship
             } else if (event.key === " ") {
                 const bullet = new Bullet(this.ship.getX(), this.ship.getY() + this.ship.getHeight() / 2, 5, 10)
-
+                
                 //meter la bala dentro del array de balas, para actualizar despues su posicion en el setInterval
                 this.bullets.push(bullet)
                 //añadir a la escena para que se pinten
@@ -189,9 +192,6 @@ class Game extends Component {
 
                 //ver si al moverse la bala colisiona con algun alien
                 bullet.onMove(() => {
-                    //si el juego esta parado, salir
-                    if (this.gameOver) return
-
                     //hacer un forEach pq son varios aliens
                     this.aliens.forEach(alien => {
                         if (bullet.collidesWith(alien)) {
@@ -232,7 +232,7 @@ class Game extends Component {
                 //la x va cambiando para cada alien
                 const x = col * (alienWidth + colSpacing) + colSpacing
                 //y es igual para los primeros 7 aliens y luego cambia para los siguientes
-                const y = this.scene.getHeight() - row * rowSpacing - alienHeight / 2
+                const y = this.scene.getHeight() - row  * rowSpacing - alienHeight / 2
 
                 const alien = new Alien(x, y, alienWidth, alienHeight)
                 this.aliens.push(alien) //guardamos cada alien en el array
@@ -240,72 +240,38 @@ class Game extends Component {
 
                 alien.onMove(() => {
                     if (this.gameOver) return
-
+                    
                     this.aliens.forEach(alien => {
-                        if (this.ship.collidesWith(alien))
-                            this.markGameOver()
+                        if (this.ship.collidesWith(alien)) {
+                            alert("Game Over!")
+
+                            this.gameOver = true
+                        }
                     })
                 })
             }
         }
 
         //un solo setInterval q cambia todos los aliens de posicion
-        //guardamos el interval id en una variable
-        this.aliensIntervalId = setInterval(() => {
-            console.log("Moving aliens")
-
+        setInterval(() => {
             const step = 10
 
-            this.aliens.forEach(alien => {
-                alien.setPosition(alien.getX(), alien.getY() - step)
-
-                //si en la posicion Y el marciano toca el borde de abajo, el juego acaba
-                if (alien.getY() - alienHeight / 2 <= 0)
-                    this.markGameOver()
-            })
-        }, 500)
+            //para la posicion de Y, hacemos un cálculo para q si salen de la pantalla al bajar, vuelvan a aparecer por arriba.
+            this.aliens.forEach(alien => alien.setPosition(alien.getX(), alien.getY() > alienHeight / 2 ? alien.getY() - step : this.scene.getHeight() - alienHeight / 2))
+        }, 300)
 
         //mover las balas hacia arriba, respecto a la posicion en la que esten
-        this.bulletsIntervalId = setInterval(() => {
-            console.log("Moving bullets")
-
+        setInterval(() => {
             const step = 5
 
-            this.bullets.forEach(bullet => bullet.setPosition(bullet.getX(), bullet.getY() + step))
+            this.bullets.forEach(bullet => {
+                bullet.setPosition(bullet.getX(), bullet.getY() + step)
+            })
+
         }, 50)
-    }
-
-    private markGameOver(): void {
-        //usamos clearInterval para q los setInterval no sigan corriendo y consumiendo memoria al terminar el juego
-        //cuando se crea un setInterval() devuelve un id, y luego se puede parar usando ese id. Para eso guardamos el id en la propia instancia de la clase.
-        clearInterval(this.aliensIntervalId)
-        clearInterval(this.bulletsIntervalId)
-
-        this.gameOver = true
-
-        alert("Game over!")
-
-        if (this.overCallback) this.overCallback()
     }
 }
 
 //Initialize the game
-const body = new Component(document.body, 450, 350, 900, 700)
-body.getContainer().style.margin = "0"
-body.getContainer().style.overflow = "hidden"
-
-function init() {
-    //Le paso los datos de la constructora (x, y, width, height)
-    const game = new Game(450, 350, 900, 700)
-    body.add(game)
-
-    //Detectar que el juego termina, quitar game del body y reiniciar
-    game.onOver(() => {
-        body.remove(game)
-
-        init()
-    })
-}
-
-//que se inicialice automaticamente cuando arranca el juego
-init()
+//Le paso los datos de la constructora (containerId, x, y, width, height)
+const game = new Game("game", 450, 350, 900, 700)

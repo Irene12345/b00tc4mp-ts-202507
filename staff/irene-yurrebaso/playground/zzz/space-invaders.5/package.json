@@ -1,0 +1,17 @@
+{
+  "name": "space-invaders",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "compile": "npx tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
